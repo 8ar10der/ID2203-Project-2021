@@ -1,4 +1,4 @@
-/*
+ /*
  * The MIT License
  *
  * Copyright 2017 Lars Kroll <lkroll@kth.se>.
@@ -23,12 +23,13 @@
  */
 package se.kth.id2203.kvstore;
 
-import se.kth.id2203.networking._;
-import se.kth.id2203.overlay.Routing;
-import se.sics.kompics.sl._;
-import se.sics.kompics.network.Network;
+import se.kth.id2203.networking._
+import se.kth.id2203.overlay.Routing
+import se.sics.kompics.network.Network
+import se.sics.kompics.sl._
 
-class KVService extends ComponentDefinition {
+class KVService extends ComponentDefinition {;
+  val storePart = Map[String, Any]("1"->"A", "2"->"B", "3" -> "C")
 
   //******* Ports ******
   val net = requires[Network];
@@ -38,12 +39,19 @@ class KVService extends ComponentDefinition {
   //******* Handlers ******
   net uponEvent {
     case NetMessage(header, op @ Get(key, _)) => {
-      log.info("Got operation {}! Now implement me please :)", op);
-      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net);
+//      log.info("Got operation {}! Now implement me please :)", op);
+//      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net);
+      storePart.get(key) match {
+        case Some(value) =>
+          trigger(NetMessage(self, header.src, op.response(OpCode.Ok, value)) -> net)
+        case None =>
+          trigger(NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net)
+      }
+
     }
     case NetMessage(header, op @ Put(key, value, _)) => {
       log.info("Got operation {}! Now implement me please :)", op);
-      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net);
+      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net)
     }
   }
 }

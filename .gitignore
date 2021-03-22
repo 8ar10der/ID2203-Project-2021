@@ -38,3 +38,4 @@ nb-configuration.xml
 .bloop/
 .metals/
 *.code-workspace
+/.bsp/sbt.json

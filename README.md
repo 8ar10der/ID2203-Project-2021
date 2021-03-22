@@ -1,4 +1,4 @@
-# ID2203 Project 2021 Starter Code for Kompics Scala
+# ID2203 Project 2021 for Kompics Scala
 
 This project contains some code to get you started with the project.
 You are encouraged to create your own forks and work on them, modifying everything and anything as you desire it.

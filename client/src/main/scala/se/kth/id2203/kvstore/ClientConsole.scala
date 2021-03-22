@@ -24,9 +24,9 @@
 package se.kth.id2203.kvstore
 
 import com.larskroll.common.repl._
-import com.typesafe.scalalogging.StrictLogging;
+import com.typesafe.scalalogging.StrictLogging
 import org.apache.log4j.Layout
-import util.log4j.ColoredPatternLayout;
+import util.log4j.ColoredPatternLayout
 import fastparse._, NoWhitespace._
 import concurrent.Await
 import concurrent.duration._
@@ -36,20 +36,21 @@ object ClientConsole {
   def uppercase[_: P] = P(CharIn("A-Z"))
   def digit[_: P] = P(CharIn("0-9"))
   def simpleStr[_: P] = P(lowercase | uppercase | digit)
-  val colouredLayout = new ColoredPatternLayout("%d{[HH:mm:ss,SSS]} %-5p {%c{1}} %m%n");
+  val colouredLayout = new ColoredPatternLayout("%d{[HH:mm:ss,SSS]} %-5p {%c{1}} %m%n")
 }
 
 case class PutObject(key: String, value: String)
 case class CasObject(key: String, refValue: String, newValue: String)
 
 class ClientConsole(val service: ClientService) extends CommandConsole with ParsedCommands with StrictLogging {
-  import ClientConsole._;
+  import ClientConsole._
 
-  override def layout: Layout = colouredLayout;
-  override def onInterrupt(): Unit = exit();
+  override def layout: Layout = colouredLayout
+
+  override def onInterrupt(): Unit = exit()
 
   val getParser = new ParsingObject[String] {
-    override def parseOperation[_: P]: P[String] = P("get" ~ " " ~ simpleStr.!);
+    override def parseOperation[_: P]: P[String] = P("get" ~ " " ~ simpleStr.!)
   }
 
   val putParser = new ParsingObject[PutObject] {
@@ -66,15 +67,22 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
   val putCommand = parsed(putParser, usage = "put <key> <value>", descr = "Executes put for <key> <value>.") {
     case PutObject(key, value) =>
       // Create a PUT operation through ClientService
-      out.println("Implement me");
+      val fr = service.put(key, value)
+      out.println(s"Put the pair <$key,$value>")
+      try {
+        val r = Await.result(fr, 5.seconds)
+        out.println("Operation complete! Response was: " + r.status)
+      } catch {
+        case e: Throwable => logger.error("Error during op.", e);
+      }
   }
 
   val getCommand = parsed(getParser, usage = "get <key>", descr = "Executes get for <key>.") { key =>
-    val fr = service.get(key);
-    out.println("Operation sent! Awaiting response...");
+    val fr = service.get(key)
+    out.println("Operation sent! Awaiting response...")
     try {
-      val r = Await.result(fr, 5.seconds);
-      out.println("Operation complete! Response was: " + r.status);
+      val r = Await.result(fr, 5.seconds)
+      out.println("Operation complete! Response was: " + r.status)
     } catch {
       case e: Throwable => logger.error("Error during op.", e);
     }
