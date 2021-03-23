@@ -21,37 +21,57 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package se.kth.id2203.kvstore;
+package se.kth.id2203.kvstore
 
 import se.kth.id2203.networking._
 import se.kth.id2203.overlay.Routing
 import se.sics.kompics.network.Network
 import se.sics.kompics.sl._
 
-class KVService extends ComponentDefinition {;
-  val storePart = Map[String, Any]("1"->"A", "2"->"B", "3" -> "C")
+import scala.collection.mutable.HashMap
+
+class KVService extends ComponentDefinition {
+  val storePart: HashMap[String, String] = HashMap("1" -> "a", "2" -> "b", "5" -> "e")
 
   //******* Ports ******
-  val net = requires[Network];
-  val route = requires(Routing);
+  val net = requires[Network]
+  val route = requires(Routing)
   //******* Fields ******
-  val self = cfg.getValue[NetAddress]("id2203.project.address");
+  val self = cfg.getValue[NetAddress]("id2203.project.address")
   //******* Handlers ******
   net uponEvent {
-    case NetMessage(header, op @ Get(key, _)) => {
-//      log.info("Got operation {}! Now implement me please :)", op);
-//      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net);
-      storePart.get(key) match {
-        case Some(value) =>
-          trigger(NetMessage(self, header.src, op.response(OpCode.Ok, value)) -> net)
-        case None =>
-          trigger(NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net)
+    case NetMessage(header, op@Get(key, _)) => {
+      //      log.info("Got operation {}! Now implement me please :)", op);
+      //      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net);
+      log.info(s"Get Command from Client<${header.src}>")
+      val value = storePart.get(key)
+      if (value.isDefined) {
+        trigger(
+//          NetMessage(self, header.src, op.response(OpCode.Ok, value.get)) -> net
+          NetMessage(self, header.src, GetResponse(op.id, OpCode.Ok, value.get)) -> net
+        )
+      } else {
+        trigger(
+          NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net
+        )
       }
 
+//      storePart.get(key) match {
+//        case Some(value) =>
+//          trigger(NetMessage(self, header.src, op.response(OpCode.Ok, value)) -> net)
+//        case None =>
+//          trigger(NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net)
+//      }
+
     }
-    case NetMessage(header, op @ Put(key, value, _)) => {
-      log.info("Got operation {}! Now implement me please :)", op);
-      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net)
+    case NetMessage(header, op@Put(key, value, _)) => {
+      //      log.info("Got operation {}! Now implement me please :)", op)
+      //      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net)
+      log.info(s"Put Command from Client<${header.src}>")
+      storePart += (key -> value)
+      trigger(
+        NetMessage(self, header.src, op.response(OpCode.Ok)) -> net
+      )
     }
   }
 }

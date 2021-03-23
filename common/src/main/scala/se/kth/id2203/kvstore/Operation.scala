@@ -23,46 +23,52 @@
  */
 package se.kth.id2203.kvstore
 
-import java.util.UUID;
-import se.sics.kompics.KompicsEvent;
+import java.util.UUID
+import se.sics.kompics.KompicsEvent
 
 trait Operation extends KompicsEvent {
-  def id: UUID;
-  def key: String;
+  def id: UUID
+
+  def key: String
 }
 
 @SerialVersionUID(-374812437823538710L)
 case class Op(key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
-  def response(status: OpCode.OpCode): OpResponse = OpResponse(id, status);
-}
-
-@SerialVersionUID(-374812437823538710L)
-case class Get(key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
-
-  def response(status: OpCode.OpCode, value: Any): GetResponse = GetResponse(id, status, value)
-
   def response(status: OpCode.OpCode): OpResponse = OpResponse(id, status)
 }
 
 @SerialVersionUID(-374812437823538710L)
+case class Get(key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
+  def response(status: OpCode.NotFound.type): OpResponse = OpResponse(id, status)
+  def response(status: OpCode.Ok.type , value: String): GetResponse = GetResponse(id, OpCode.Ok, value)
+}
+
+@SerialVersionUID(-374812437823538710L)
 case class Put(key: String, value: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
-  def response(status: OpCode.OpCode): OpResponse = OpResponse(id, status);
+  def response(status: OpCode.OpCode): PutResponse = PutResponse(id, status)
 }
 
 object OpCode {
-  sealed trait OpCode;
-  case object Ok extends OpCode;
-  case object NotFound extends OpCode;
-  case object NotImplemented extends OpCode;
+  sealed trait OpCode
+
+  case object Ok extends OpCode
+
+  case object NotFound extends OpCode
+
+  case object NotImplemented extends OpCode
+
 }
 
 trait OperationResponse extends KompicsEvent {
-  def id: UUID;
-  def status: OpCode.OpCode;
+  def id: UUID
+  def status: OpCode.OpCode
 }
 
 @SerialVersionUID(155271583133228661L)
-case class OpResponse(id: UUID, status: OpCode.OpCode) extends OperationResponse with Serializable;
+case class OpResponse(id: UUID, status: OpCode.OpCode) extends OperationResponse with Serializable
 
 @SerialVersionUID(155271583133228661L)
-case class GetResponse(id: UUID, status: OpCode.OpCode, value: Any) extends OperationResponse with Serializable;
+case class GetResponse(id: UUID, status: OpCode.OpCode, value: String) extends OperationResponse with Serializable
+
+@SerialVersionUID(155271583133228663L)
+case class PutResponse(id: UUID, status: OpCode.OpCode) extends OperationResponse with Serializable

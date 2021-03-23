@@ -25,18 +25,18 @@ package se.kth.id2203.kvstore
 
 import java.util.UUID
 import se.kth.id2203.networking._
-
 import se.kth.id2203.overlay._
 import se.sics.kompics.sl._
 import se.sics.kompics.{Kompics, KompicsEvent, Start}
 import se.sics.kompics.network.Network
 import se.sics.kompics.timer._
+
 import collection.mutable
 import concurrent.{Future, Promise}
 
 case class ConnectTimeout(spt: ScheduleTimeout) extends Timeout(spt)
 
-case class OpWithPromise(op: Operation, promise: Promise[OpResponse] = Promise()) extends KompicsEvent
+case class OpWithPromise(op: Operation, promise: Promise[OperationResponse] = Promise()) extends KompicsEvent
 
 class ClientService extends ComponentDefinition {
 
@@ -48,7 +48,7 @@ class ClientService extends ComponentDefinition {
   val server = cfg.getValue[NetAddress]("id2203.project.bootstrap-address")
   private var connected: Option[ConnectAck] = None
   private var timeoutId: Option[UUID] = None
-  private val pending = mutable.SortedMap.empty[UUID, Promise[OpResponse]]
+  private val pending = mutable.SortedMap.empty[UUID, Promise[OperationResponse]]
 
   //******* Handlers ******
   ctrl uponEvent {
@@ -76,8 +76,9 @@ class ClientService extends ComponentDefinition {
       val tc = new Thread(c)
       tc.start()
     }
-    case NetMessage(header, or @ OpResponse(id, status)) => {
+    case NetMessage(header, or: OperationResponse) => {
       log.debug(s"Got OpResponse: $or")
+      val id = or.id
       pending.remove(id) match {
         case Some(promise) => promise.success(or);
         case None          => log.warn(s"ID $id was not pending! Ignoring response.");
@@ -105,14 +106,14 @@ class ClientService extends ComponentDefinition {
     }
   }
 
-  def get(key: String): Future[OpResponse] = {
+  def get(key: String): Future[OperationResponse] = {
     val op = Get(key)
     val owf = OpWithPromise(op)
     trigger(owf -> onSelf)
     owf.promise.future
   }
 
-  def put(key: String, value: String): Future[OpResponse] = {
+  def put(key: String, value: String): Future[OperationResponse] = {
     val op = Put(key, value)
     val owf = OpWithPromise(op)
     trigger(owf -> onSelf)
