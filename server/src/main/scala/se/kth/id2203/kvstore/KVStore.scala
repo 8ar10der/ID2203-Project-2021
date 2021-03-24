@@ -41,13 +41,10 @@ class KVService extends ComponentDefinition {
   //******* Handlers ******
   net uponEvent {
     case NetMessage(header, op@Get(key, _)) => {
-      //      log.info("Got operation {}! Now implement me please :)", op);
-      //      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net);
       log.info(s"Get Command from Client<${header.src}>")
       val value = storePart.get(key)
       if (value.isDefined) {
         trigger(
-//          NetMessage(self, header.src, op.response(OpCode.Ok, value.get)) -> net
           NetMessage(self, header.src, GetResponse(op.id, OpCode.Ok, value.get)) -> net
         )
       } else {
@@ -56,22 +53,33 @@ class KVService extends ComponentDefinition {
         )
       }
 
-//      storePart.get(key) match {
-//        case Some(value) =>
-//          trigger(NetMessage(self, header.src, op.response(OpCode.Ok, value)) -> net)
-//        case None =>
-//          trigger(NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net)
-//      }
-
     }
     case NetMessage(header, op@Put(key, value, _)) => {
-      //      log.info("Got operation {}! Now implement me please :)", op)
-      //      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net)
       log.info(s"Put Command from Client<${header.src}>")
       storePart += (key -> value)
       trigger(
         NetMessage(self, header.src, op.response(OpCode.Ok)) -> net
       )
+    }
+    case NetMessage(header, op@Cas(key, referenceValue, newValue, _)) => {
+      log.info(s"Cas Command from Client<${header.src}>")
+      if (storePart.contains(key)){
+        val value = storePart(key)
+        if(value == referenceValue){
+          storePart += (key -> newValue)
+          trigger(
+            NetMessage(self, header.src, op.response(OpCode.Ok)) -> net
+          )
+        } else {
+          trigger(
+            NetMessage(self, header.src, op.response(OpCode.NotSwap)) -> net
+          )
+        }
+      } else {
+        trigger(
+          NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net
+        )
+      }
     }
   }
 }

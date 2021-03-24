@@ -50,7 +50,7 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
   override def onInterrupt(): Unit = exit()
 
   val getParser = new ParsingObject[String] {
-    override def parseOperation[_: P]: P[String] = P("get" ~ " " ~ simpleStr.!)
+    override def parseOperation[_: P]: P[String] = P("get" ~ " " ~ simpleStr.rep.!)
   }
 
   val putParser = new ParsingObject[PutObject] {
@@ -96,8 +96,22 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
                           usage = "cas <key> <ref-value> <new-value>",
                           descr = "Executes cas for <key> <ref-value> <new-value>.") {
     case CasObject(key, refValue, newValue) =>
-      // Create a CAS operation through ClientService
-      out.println("Implement me");
+      val fr = service.cas(key, refValue, newValue)
+      out.println(s"CAS the pair <$key,$refValue,$newValue>")
+      try{
+        val r = Await.result(fr, 5.seconds)
+        out.println("Operation sent! Awaiting response...")
+        r.status match {
+          case OpCode.Ok =>
+            out.println(s"The values are same and swapped")
+          case OpCode.NotSwap =>
+            out.println(s"The value are not same")
+          case OpCode.NotFound =>
+            out.println(s"Not found the key")
+        }
+      } catch {
+        case e: Throwable => logger.error("Error during op.", e);
+      }
   }
 
 }

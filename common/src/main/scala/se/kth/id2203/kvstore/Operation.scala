@@ -48,6 +48,11 @@ case class Put(key: String, value: String, id: UUID = UUID.randomUUID()) extends
   def response(status: OpCode.OpCode): PutResponse = PutResponse(id, status)
 }
 
+@SerialVersionUID(-374812437823538710L)
+case class Cas(key: String, referenceValue: String, newValue: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
+  def response(status: OpCode.OpCode): PutResponse = PutResponse(id, status)
+}
+
 object OpCode {
   sealed trait OpCode
 
@@ -56,6 +61,8 @@ object OpCode {
   case object NotFound extends OpCode
 
   case object NotImplemented extends OpCode
+
+  case object NotSwap extends OpCode
 
 }
 
@@ -72,3 +79,6 @@ case class GetResponse(id: UUID, status: OpCode.OpCode, value: String) extends O
 
 @SerialVersionUID(155271583133228663L)
 case class PutResponse(id: UUID, status: OpCode.OpCode) extends OperationResponse with Serializable
+
+@SerialVersionUID(155271583133228663L)
+case class CasResponse(id: UUID, status: OpCode.OpCode) extends OperationResponse with Serializable
