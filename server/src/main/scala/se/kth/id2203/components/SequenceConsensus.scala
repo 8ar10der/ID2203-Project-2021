@@ -1,7 +1,9 @@
 package se.kth.id2203.components
 
 import se.kth.id2203.components
-import se.kth.id2203.networking.{NetAddress, NetMessage}
+import se.kth.id2203.kvstore.Operation
+import se.kth.id2203.networking.{NetAddress, NetHeader, NetMessage}
+import se.kth.id2203.overlay.LookupTable
 import se.sics.kompics.KompicsEvent
 import se.sics.kompics.network._
 import se.sics.kompics.sl._
@@ -11,13 +13,14 @@ import scala.collection.mutable
 class SequenceConsensus extends Port {
   request[SC_Propose]
   indication[SC_Decide]
+  request[SC_Set]
 }
 
 case class SC_Propose(value: Operation) extends KompicsEvent
 
 case class SC_Decide(value: Operation) extends KompicsEvent
 
-trait Operation
+case class SC_Set(value: LookupTable) extends KompicsEvent
 
 case class Prepare(nL: Long, ld: Int, na: Long) extends KompicsEvent
 
@@ -61,31 +64,33 @@ class SequencePaxos() extends ComponentDefinition {
   val net: PositivePort[Network] = requires[Network]
 
   val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address")
-  val pi: Set[NetAddress] = Set[NetAddress]()
-  val others: Set[NetAddress] = Set[NetAddress]()
+  var pi: Set[NetAddress] = Set[NetAddress]()
+  var others: Set[NetAddress] = Set[NetAddress]()
 
-  val majority: Int = (pi.size / 2) + 1
+  var majority: Int = (pi.size / 2) + 1
 
   var state: (components.Role.Value, components.State.Value) = (FOLLOWER, UNKOWN)
   var nL = 0L
   var nProm = 0L
-  var leader: Option[Address] = None
+  var leader: Option[NetAddress] = None
   var na = 0L
   var va = List.empty[Operation]
   var ld = 0
   // leader state
   var propCmds = List.empty[Operation]
-  val las = mutable.Map.empty[Address, Int]
-  val lds = mutable.Map.empty[Address, Int]
+  val las = mutable.Map.empty[NetAddress, Int]
+  val lds = mutable.Map.empty[NetAddress, Int]
   var lc = 0
-  val acks = mutable.Map.empty[Address, (Long, List[Operation])]
+  val acks = mutable.Map.empty[NetAddress, (Long, List[Operation])]
 
   ble uponEvent {
     case BLE_Leader(l, n) =>
       if (n > nL) {
         leader = Some(l)
+        log.info(s"$self: New leader is $leader")
         nL = n
         if (self == l && nL > nProm) {
+          log.info(s"$self: I am now leader for term $nL!")
           state = (LEADER, PREPARE)
           propCmds = propCmds.empty
           las.clear
@@ -101,6 +106,8 @@ class SequencePaxos() extends ComponentDefinition {
           lds += (self -> ld)
           nProm = nL
         } else {
+          if (state._1 != FOLLOWER)
+            log.info("$self: No longer leader :(")
           state = (FOLLOWER, state._2)
         }
       }
@@ -182,6 +189,7 @@ class SequencePaxos() extends ComponentDefinition {
     case NetMessage(_, Decide(l, nL)) =>
       if (nProm == nL) {
         while (ld < l) {
+          log.info(s"$self: Deciding on ${ld+1}")
           trigger(
             SC_Decide(va(ld)) -> sc
           )
@@ -191,7 +199,7 @@ class SequencePaxos() extends ComponentDefinition {
     case NetMessage(a, Accepted(n, m)) =>
       if ((n == nL) && (state == (LEADER, ACCEPT))) {
         las += (a.getSource() -> m)
-        if (lc < m && pi.count(las.get(_) >= m) >= majority) {
+        if (lc < m && pi.count(las.get(_).get >= m) >= majority) {
           lc = m
           for (p <- pi.filter(lds.contains(_))) {
             trigger(
@@ -203,6 +211,13 @@ class SequencePaxos() extends ComponentDefinition {
   }
 
   sc uponEvent {
+    case SC_Set(p) =>
+      pi = p.getNodes()
+      others = pi - self
+      majority = (pi.size / 2) + 1
+      trigger(
+        BLE_Set(pi) -> ble
+      )
     case SC_Propose(c) =>
       if (state == (LEADER, PREPARE)) {
         propCmds = c +: propCmds
@@ -215,6 +230,13 @@ class SequencePaxos() extends ComponentDefinition {
               NetMessage(self, p, Accept(nL, c)) -> net
             )
           }
+        }
+      } else {
+        if (leader.isDefined) {
+          log.info(s"$self: NOT LEADER -> Forwarding: $c To: $leader")
+          trigger(NetMessage(self, leader.get, c) -> net)
+        } else {
+          log.info(s"$self: There is no leader, can't accept Propose")
         }
       }
   }

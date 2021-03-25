@@ -23,12 +23,14 @@
  */
 package se.kth.id2203.kvstore
 
+import se.kth.id2203.networking.NetHeader
+
 import java.util.UUID
 import se.sics.kompics.KompicsEvent
 
 trait Operation extends KompicsEvent {
-  def id: UUID
 
+  def id: UUID
   def key: String
 }
 

@@ -24,10 +24,12 @@
 package se.kth.id2203.overlay
 
 import se.kth.id2203.bootstrapping._
+import se.kth.id2203.components.{SC_Set, SequenceConsensus}
 import se.kth.id2203.networking._
 import se.sics.kompics.sl._
 import se.sics.kompics.network.Network
 import se.sics.kompics.timer.Timer
+
 import util.Random
 
 /**
@@ -47,7 +49,7 @@ class VSOverlayManager extends ComponentDefinition {
   val route = provides(Routing)
   val boot = requires(Bootstrapping)
   val net = requires[Network]
-  val timer = requires[Timer]
+  val sc = requires[SequenceConsensus]
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address")
   private var lut: Option[LookupTable] = None
@@ -65,13 +67,16 @@ class VSOverlayManager extends ComponentDefinition {
     case Booted(assignment: LookupTable) => {
       log.info("Got NodeAssignment, overlay ready.")
       lut = Some(assignment)
+      trigger(
+        new SC_Set(assignment) -> sc
+      )
     }
   }
 
   net uponEvent {
     case NetMessage(header, RouteMsg(key, msg)) => {
       val nodes = lut.get.lookup(key)
-      assert(!nodes.isEmpty)
+      assert(nodes.nonEmpty)
       val i = Random.nextInt(nodes.size)
       val target = nodes.drop(i).head
       log.info(s"Forwarding message for key $key to $target")
@@ -92,7 +97,7 @@ class VSOverlayManager extends ComponentDefinition {
   route uponEvent {
     case RouteMsg(key, msg) => {
       val nodes = lut.get.lookup(key)
-      assert(!nodes.isEmpty)
+      assert(nodes.nonEmpty)
       val i = Random.nextInt(nodes.size)
       val target = nodes.drop(i).head
       log.info(s"Routing message for key $key to $target")

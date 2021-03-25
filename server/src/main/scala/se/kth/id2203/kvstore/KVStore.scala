@@ -23,63 +23,81 @@
  */
 package se.kth.id2203.kvstore
 
+import se.kth.id2203.components.{SC_Decide, SC_Propose, SequenceConsensus}
 import se.kth.id2203.networking._
 import se.kth.id2203.overlay.Routing
 import se.sics.kompics.network.Network
 import se.sics.kompics.sl._
 
-import scala.collection.mutable.HashMap
+import java.util.UUID
+import scala.collection.mutable
 
 class KVService extends ComponentDefinition {
-  val storePart: HashMap[String, String] = HashMap("1" -> "a", "2" -> "b", "5" -> "e")
 
   //******* Ports ******
-  val net = requires[Network]
-  val route = requires(Routing)
+  val net: PositivePort[Network] = requires[Network]
+  val route: PositivePort[Routing.type] = requires(Routing)
+  val sc: PositivePort[SequenceConsensus] = requires[SequenceConsensus]
   //******* Fields ******
-  val self = cfg.getValue[NetAddress]("id2203.project.address")
+  val storePart: mutable.HashMap[String, String] = mutable.HashMap("1" -> "a", "2" -> "ab", "10" -> "abcde")
+  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address")
+  val opHeaders: mutable.Map[UUID, NetHeader] = mutable.HashMap().empty
   //******* Handlers ******
-  net uponEvent {
-    case NetMessage(header, op@Get(key, _)) => {
-      log.info(s"Get Command from Client<${header.src}>")
-      val value = storePart.get(key)
-      if (value.isDefined) {
-        trigger(
-          NetMessage(self, header.src, GetResponse(op.id, OpCode.Ok, value.get)) -> net
-        )
-      } else {
-        trigger(
-          NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net
-        )
-      }
-
-    }
-    case NetMessage(header, op@Put(key, value, _)) => {
-      log.info(s"Put Command from Client<${header.src}>")
-      storePart += (key -> value)
+  net uponEvent{
+    case NetMessage(header, op: Operation) =>
+      log.debug(s"Got $op from Client<${header.getSource()}>")
+      opHeaders += (op.id -> header)
       trigger(
-        NetMessage(self, header.src, op.response(OpCode.Ok)) -> net
+        SC_Propose(op) -> sc
       )
-    }
-    case NetMessage(header, op@Cas(key, referenceValue, newValue, _)) => {
-      log.info(s"Cas Command from Client<${header.src}>")
-      if (storePart.contains(key)){
-        val value = storePart(key)
-        if(value == referenceValue){
-          storePart += (key -> newValue)
+  }
+
+
+  sc uponEvent {
+    case SC_Decide(o: Operation) =>
+      log.info("-------------------------------------------------------------------------------")
+      val header: NetHeader = opHeaders(o.id)
+      o match {
+        case Get(key, _) =>
+          val op = o.asInstanceOf[Get]
+          log.info(s"Get Command from Client<${header.src}>")
+          val value = storePart.get(key)
+          if (value.isDefined) {
+            trigger(
+              NetMessage(self, header.src, GetResponse(op.id, OpCode.Ok, value.get)) -> net
+            )
+          } else {
+            trigger(
+              NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net
+            )
+          }
+        case Put(key, value, _) =>
+          val op = o.asInstanceOf[Put]
+          log.info(s"Put Command from Client<${header.src}>")
+          storePart += (key -> value)
           trigger(
             NetMessage(self, header.src, op.response(OpCode.Ok)) -> net
           )
-        } else {
-          trigger(
-            NetMessage(self, header.src, op.response(OpCode.NotSwap)) -> net
-          )
-        }
-      } else {
-        trigger(
-          NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net
-        )
+        case Cas(key, referenceValue, newValue, _) =>
+          val op = o.asInstanceOf[Cas]
+          log.info(s"Cas Command from Client<${header.src}>")
+          if (storePart.contains(key)) {
+            val value = storePart(key)
+            if (value == referenceValue) {
+              storePart += (key -> newValue)
+              trigger(
+                NetMessage(self, header.src, op.response(OpCode.Ok)) -> net
+              )
+            } else {
+              trigger(
+                NetMessage(self, header.src, op.response(OpCode.NotSwap)) -> net
+              )
+            }
+          } else {
+            trigger(
+              NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net
+            )
+          }
       }
-    }
   }
 }

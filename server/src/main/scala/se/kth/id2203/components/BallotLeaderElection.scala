@@ -10,17 +10,21 @@ import scala.collection.mutable
 
 class BallotLeaderElection extends Port {
   indication[BLE_Leader]
+  request[BLE_Set]
 }
 
-case class BLE_Leader(leader: Address, ballot: Long) extends KompicsEvent
+@SerialVersionUID(121314583133228661L)
+case class BLE_Leader(leader: NetAddress, ballot: Long) extends KompicsEvent with Serializable
+@SerialVersionUID(121314583133228661L)
+case class BLE_Set(topology: Set[NetAddress]) extends KompicsEvent with Serializable
 
 //Provided Primitives to use in your implementation
-
-case class CheckTimeout(timeout: ScheduleTimeout) extends Timeout(timeout)
-
-case class HeartbeatReq(round: Long, highestBallot: Long) extends KompicsEvent
-
-case class HeartbeatResp(round: Long, ballot: Long) extends KompicsEvent
+@SerialVersionUID(121314583133228661L)
+case class CheckTimeout(timeout: ScheduleTimeout) extends Timeout(timeout) with Serializable
+@SerialVersionUID(121314583133228661L)
+case class HeartbeatReq(round: Long, highestBallot: Long) extends KompicsEvent with Serializable
+@SerialVersionUID(121314583133228661L)
+case class HeartbeatResp(round: Long, ballot: Long) extends KompicsEvent with Serializable
 
 class GossipLeaderElection() extends ComponentDefinition {
 
@@ -48,11 +52,11 @@ class GossipLeaderElection() extends ComponentDefinition {
 
   val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address")
 
-  val topology: List[NetAddress] = cfg.getValue[List[NetAddress]]("ble.simulation.topology")
-  val delta: Long = cfg.getValue[Long]("ble.simulation.delay")
-  val majority: Int = (topology.size / 2) + 1
+  var topology: List[NetAddress] = List[NetAddress]().empty
+  val delta: Long = cfg.getValue[Long]("id2203.project.delay")
+  var majority: Int = 0
 
-  private var period = cfg.getValue[Long]("ble.simulation.delay")
+  private var period = cfg.getValue[Long]("id2203.project.delay")
   private val ballots = mutable.Map.empty[NetAddress, Long]
 
   private var round = 0L
@@ -84,7 +88,7 @@ class GossipLeaderElection() extends ComponentDefinition {
       while (ballot <= highestBallot) {
         ballot = incrementBallot(ballot)
       }
-      leader = null
+      leader = None
     } else {
       val top = (topBallot, topProcess)
       if (!leader.contains(top)) {
@@ -97,8 +101,10 @@ class GossipLeaderElection() extends ComponentDefinition {
     }
   }
 
-  ctrl uponEvent {
-    case _: Start =>
+  ble uponEvent {
+    case BLE_Set(t) =>
+      topology = topology ::: t.toList
+      majority = (topology.size / 2) + 1
       startTimer(period)
   }
 
@@ -129,7 +135,7 @@ class GossipLeaderElection() extends ComponentDefinition {
       )
     case NetMessage(src, HeartbeatResp(r, b)) =>
       if (r == round) {
-        ballots += (src.getSource(), b)
+        ballots += (src.getSource() -> b)
       } else {
         period += delta
       }
