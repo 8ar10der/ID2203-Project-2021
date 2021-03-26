@@ -21,50 +21,83 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package se.kth.id2203.simulation;
+package se.kth.id2203.simulation
 
-import java.util.UUID;
-import se.kth.id2203.kvstore._;
-import se.kth.id2203.networking._;
-import se.kth.id2203.overlay.RouteMsg;
+import java.util.UUID
+import se.kth.id2203.kvstore._
+import se.kth.id2203.networking._
+import se.kth.id2203.overlay.RouteMsg
 import se.sics.kompics.sl._
-import se.sics.kompics.Start;
-import se.sics.kompics.network.Network;
-import se.sics.kompics.timer.Timer;
-import se.sics.kompics.sl.simulator.SimulationResult;
-import collection.mutable;
+import se.sics.kompics.Start
+import se.sics.kompics.network.Network
+import se.sics.kompics.timer.Timer
+import se.sics.kompics.sl.simulator.SimulationResult
+import collection.mutable
 
 class ScenarioClient extends ComponentDefinition {
 
   //******* Ports ******
-  val net = requires[Network];
-  val timer = requires[Timer];
+  val net = requires[Network]
+  val timer = requires[Timer]
   //******* Fields ******
-  val self = cfg.getValue[NetAddress]("id2203.project.address");
-  val server = cfg.getValue[NetAddress]("id2203.project.bootstrap-address");
-  private val pending = mutable.Map.empty[UUID, String];
+  val self = cfg.getValue[NetAddress]("id2203.project.address")
+  val server = cfg.getValue[NetAddress]("id2203.project.bootstrap-address")
+  private val pending = mutable.Map.empty[UUID, String]
+  private var casOp = Set.empty[UUID]
+  private val ops = mutable.Queue.empty[Operation]
   //******* Handlers ******
   ctrl uponEvent {
-    case _: Start => {
-      val messages = SimulationResult[Int]("messages");
+    case _: Start =>
+      val messages = SimulationResult[Int]("messages")
       for (i <- 0 to messages) {
-        val op = new Get(s"test$i");
-        val routeMsg = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
-        trigger(NetMessage(self, server, routeMsg) -> net);
-        pending += (op.id -> op.key);
-        logger.info("Sending {}", op);
-        SimulationResult += (op.key -> "Sent");
+        val put = new Put(s"test$i", s"i")
+        val putMsg = RouteMsg(put.key, put)
+        trigger(NetMessage(self, server, putMsg) -> net)
+        pending += (put.id -> put.key)
+        logger.info("Sending {}", put)
+        SimulationResult += (put.key -> "Sent")
+        //Get
+        val get = new Get(s"test$i")
+        val getMsg = RouteMsg(get.key, get); // don't know which partition is responsible, so ask the bootstrap server to forward it
+        trigger(NetMessage(self, server, getMsg) -> net)
+        pending += (get.id -> get.key)
+        logger.info("Sending {}", get)
+        SimulationResult += (get.key -> "Sent")
       }
-    }
+      for(i <- 0 to messages/2) {
+        val newValue = i + 1
+        val cas = new Cas(s"test$i",s"$i",s"${i*10}")
+        val casMsg = RouteMsg(cas.key, cas)
+        trigger(NetMessage(self, server, casMsg) -> net)
+        pending += (cas.id -> cas.key)
+        casOp += cas.id
+        logger.info("Sending {}", cas)
+        SimulationResult += (cas.key -> "Sent")
+      }
   }
 
   net uponEvent {
-    case NetMessage(header, or @ OpResponse(id, status)) => {
-      logger.debug(s"Got OpResponse: $or");
+    case NetMessage(header, or @ OpResponse(id, status)) =>
+      logger.debug(s"Got OpResponse: $or")
+      if (casOp.contains(id)){
+        val tempOps = ops.clone()
+        for(i <- 0 to SimulationResult[Int]("messages")*2){
+          val opr = tempOps.dequeue()
+          while(!opr.id.equals(ops.dequeue().id)){
+            if(ops.isEmpty){
+              SimulationResult += (s"Linearizable: $i" -> "false")
+              log.info("Not Linearizable")
+            }
+            else{
+              SimulationResult += (s"Linearizable: $i" -> "true")
+              log.info("Is Linearizable")
+            }
+          }
+        }
+      }
       pending.remove(id) match {
         case Some(key) => SimulationResult += (key -> status.toString());
         case None      => logger.warn("ID $id was not pending! Ignoring response.");
       }
-    }
   }
 }

@@ -121,14 +121,17 @@ object SimpleScenario {
 
   def scenario(servers: Int): JSimulationScenario = {
 
-    val networkSetup = raise(1, setUniformLatencyNetwork()).arrival(constant(0));
+//    val networkSetup = raise(1, setUniformLatencyNetwork()).arrival(constant(0));
     val startCluster = raise(servers, startServerOp, 1.toN).arrival(constant(1.second));
     val startClients = raise(1, startClientOp, 1.toN).arrival(constant(1.second));
 
-    networkSetup andThen
-      0.seconds afterTermination startCluster andThen
-      10.seconds afterTermination startClients andThen
-      100.seconds afterTermination Terminate
+//    networkSetup andThen
+//      0.seconds afterTermination startCluster andThen
+//      10.seconds afterTermination startClients andThen
+//      100.seconds afterTermination Terminate
+    startCluster andThen
+        10.seconds afterTermination startClients andThen
+        100.seconds afterTermination Terminate
   }
 
 }
