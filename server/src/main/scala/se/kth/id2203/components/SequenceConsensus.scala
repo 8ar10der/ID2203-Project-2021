@@ -84,33 +84,38 @@ class SequencePaxos() extends ComponentDefinition {
   val acks = mutable.Map.empty[NetAddress, (Long, List[Operation])]
 
   ble uponEvent {
-    case BLE_Leader(l, n) =>
+    case BLE_Leader(l, n) => {
+      log.info(s"$self: BLE_Leader($l, $n)");
       if (n > nL) {
-        leader = Some(l)
-        log.info(s"$self: New leader is $leader")
-        nL = n
+        leader = Some(l);
+        log.info(s"$self: New leader is $leader");
+        nL = n;
         if (self == l && nL > nProm) {
-          log.info(s"$self: I am now leader for term $nL!")
-          state = (LEADER, PREPARE)
-          propCmds = propCmds.empty
-          las.clear
-          lds.clear
-          acks.clear
-          lc = 0
-          for (p <- others) {
-            trigger(
-              NetMessage(self, p, Prepare(nL, ld, na)) -> net
-            )
+          // We are the leader!
+          log.info(s"$self: I am now leader for term $nL!");
+          state = (LEADER, PREPARE);
+          propCmds = List.empty;
+          las.clear();
+          lds.clear();
+          acks.clear();
+          lc = 0;
+          // Request promises from all nodes
+          for (p <- pi) {
+            if (p != self) {
+              trigger(NetMessage(self, p, Prepare(nL, ld, na)) -> net);
+            }
           }
-          acks += (l -> (na, suffix(va, ld)))
-          lds += (self -> ld)
-          nProm = nL
+          acks(self) = (na, va.takeRight(ld));
+          lds(self) = ld;
+          nProm = nL;
         } else {
+          //We are not the leader, make sure our state reflects that
           if (state._1 != FOLLOWER)
-            log.info("$self: No longer leader :(")
-          state = (FOLLOWER, state._2)
+            log.info("$self: No longer leader :(");
+          state = (FOLLOWER, state._2);
         }
       }
+    }
   }
 
   net uponEvent {
@@ -181,7 +186,8 @@ class SequencePaxos() extends ComponentDefinition {
       }
     case NetMessage(p, Accept(nL, c)) =>
       if ((nProm == nL) && (state == (FOLLOWER, ACCEPT))) {
-        va = c +: va
+        //Can not be va = c +: va, I don't know why
+        va = va :+ c
         trigger(
           NetMessage(self, p.getSource(), Accepted(nL, va.size)) -> net
         )
@@ -199,7 +205,7 @@ class SequencePaxos() extends ComponentDefinition {
     case NetMessage(a, Accepted(n, m)) =>
       if ((n == nL) && (state == (LEADER, ACCEPT))) {
         las += (a.getSource() -> m)
-        if (lc < m && pi.count(las.get(_).get >= m) >= majority) {
+        if (lc < m && pi.filter(las.get(_).get >= m).size >= majority) {
           lc = m
           for (p <- pi.filter(lds.contains(_))) {
             trigger(

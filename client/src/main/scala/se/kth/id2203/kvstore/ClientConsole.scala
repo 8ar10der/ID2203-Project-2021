@@ -85,6 +85,8 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
       if(r.status == OpCode.Ok){
         val gr = r.asInstanceOf[GetResponse]
         out.println(s"Value is ${gr.value}")
+      } else if (r.status == OpCode.NotFound) {
+        out.println(s"Value can not found")
       }
       out.println("Operation complete! Response was: " + r.status)
     } catch {

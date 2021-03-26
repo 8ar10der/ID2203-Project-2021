@@ -15,8 +15,6 @@ case class Suspect(src: Address) extends KompicsEvent
 
 case class Restore(src: Address) extends KompicsEvent
 
-case class CheckTimeout(timeout: ScheduleTimeout) extends Timeout(timeout);
-
 case class HeartbeatReply(seq: Int) extends KompicsEvent;
 case class HeartbeatRequest(seq: Int) extends KompicsEvent;
 
