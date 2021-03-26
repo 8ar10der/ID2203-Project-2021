@@ -45,7 +45,7 @@ class KVService extends ComponentDefinition {
   //******* Handlers ******
   net uponEvent{
     case NetMessage(header, op: Operation) =>
-      log.debug(s"Got $op from Client<${header.getSource()}>")
+      log.debug(s"++++++++++++++++++++++++++++++++Got $op from Client<${header.getSource()}>")
       opHeaders += (op.id -> header)
       trigger(
         SC_Propose(op) -> sc
@@ -64,7 +64,7 @@ class KVService extends ComponentDefinition {
           val value = storePart.get(key)
           if (value.isDefined) {
             trigger(
-              NetMessage(self, header.src, GetResponse(op.id, OpCode.Ok, value.get)) -> net
+              NetMessage(self, header.src, op.response(OpCode.Ok, value.get)) -> net
             )
           } else {
             trigger(

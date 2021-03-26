@@ -68,7 +68,7 @@ class VSOverlayManager extends ComponentDefinition {
       log.info("Got NodeAssignment, overlay ready.")
       lut = Some(assignment)
       trigger(
-        new SC_Set(assignment) -> sc
+        SC_Set(assignment) -> sc
       )
     }
   }

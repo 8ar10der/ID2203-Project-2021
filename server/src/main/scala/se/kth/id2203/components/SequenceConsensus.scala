@@ -67,7 +67,7 @@ class SequencePaxos() extends ComponentDefinition {
   var pi: Set[NetAddress] = Set[NetAddress]()
   var others: Set[NetAddress] = Set[NetAddress]()
 
-  var majority: Int = (pi.size / 2) + 1
+  var majority: Int = 0
 
   var state: (components.Role.Value, components.State.Value) = (FOLLOWER, UNKOWN)
   var nL = 0L

@@ -42,7 +42,7 @@ case class Op(key: String, id: UUID = UUID.randomUUID()) extends Operation with 
 @SerialVersionUID(-374812437823538710L)
 case class Get(key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
   def response(status: OpCode.NotFound.type): OpResponse = OpResponse(id, status)
-  def response(status: OpCode.Ok.type , value: String): GetResponse = GetResponse(id, OpCode.Ok, value)
+  def response(status: OpCode.Ok.type , value: String): GetResponse = GetResponse(id, status, value)
 }
 
 @SerialVersionUID(-374812437823538710L)
