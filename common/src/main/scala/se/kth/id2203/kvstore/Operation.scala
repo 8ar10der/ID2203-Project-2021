@@ -39,18 +39,18 @@ case class Op(key: String, id: UUID = UUID.randomUUID()) extends Operation with 
   def response(status: OpCode.OpCode): OpResponse = OpResponse(id, status)
 }
 
-@SerialVersionUID(-374812437823538710L)
+@SerialVersionUID(-374812437823538711L)
 case class Get(key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
   def response(status: OpCode.NotFound.type): OpResponse = OpResponse(id, status)
   def response(status: OpCode.Ok.type , value: String): GetResponse = GetResponse(id, status, value)
 }
 
-@SerialVersionUID(-374812437823538710L)
+@SerialVersionUID(-374812437823538712L)
 case class Put(key: String, value: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
   def response(status: OpCode.OpCode): PutResponse = PutResponse(id, status)
 }
 
-@SerialVersionUID(-374812437823538710L)
+@SerialVersionUID(-374812437823538713L)
 case class Cas(key: String, referenceValue: String, newValue: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
   def response(status: OpCode.OpCode): PutResponse = PutResponse(id, status)
 }
@@ -73,13 +73,13 @@ trait OperationResponse extends KompicsEvent {
   def status: OpCode.OpCode
 }
 
-@SerialVersionUID(155271583133228661L)
+@SerialVersionUID(155271583133228660L)
 case class OpResponse(id: UUID, status: OpCode.OpCode) extends OperationResponse with Serializable
 
 @SerialVersionUID(155271583133228661L)
 case class GetResponse(id: UUID, status: OpCode.OpCode, value: String) extends OperationResponse with Serializable
 
-@SerialVersionUID(155271583133228663L)
+@SerialVersionUID(155271583133228662L)
 case class PutResponse(id: UUID, status: OpCode.OpCode) extends OperationResponse with Serializable
 
 @SerialVersionUID(155271583133228663L)

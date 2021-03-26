@@ -41,12 +41,12 @@ class KVService extends ComponentDefinition {
   //******* Fields ******
   val storePart: mutable.HashMap[String, String] = mutable.HashMap("1" -> "a", "2" -> "ab", "10" -> "abcde")
   val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address")
-  val opHeaders: mutable.Map[UUID, NetHeader] = mutable.HashMap().empty
+  val opSrcs: mutable.Map[UUID, NetAddress] = mutable.HashMap().empty
   //******* Handlers ******
   net uponEvent{
     case NetMessage(header, op: Operation) =>
       log.debug(s"++++++++++++++++++++++++++++++++Got $op from Client<${header.getSource()}>")
-      opHeaders += (op.id -> header)
+      opSrcs += (op.id -> header.getSource())
       trigger(
         SC_Propose(op) -> sc
       )
@@ -56,46 +56,46 @@ class KVService extends ComponentDefinition {
   sc uponEvent {
     case SC_Decide(o: Operation) =>
       log.info("-------------------------------------------------------------------------------")
-      val header: NetHeader = opHeaders(o.id)
+      val src: NetAddress = opSrcs.getOrElse(o.id, self)
       o match {
         case Get(key, _) =>
           val op = o.asInstanceOf[Get]
-          log.info(s"Get Command from Client<${header.src}>")
+          log.info(s"Get Command from Client<${src}>")
           val value = storePart.get(key)
           if (value.isDefined) {
             trigger(
-              NetMessage(self, header.src, op.response(OpCode.Ok, value.get)) -> net
+              NetMessage(self, src, op.response(OpCode.Ok, value.get)) -> net
             )
           } else {
             trigger(
-              NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net
+              NetMessage(self, src, op.response(OpCode.NotFound)) -> net
             )
           }
         case Put(key, value, _) =>
           val op = o.asInstanceOf[Put]
-          log.info(s"Put Command from Client<${header.src}>")
+          log.info(s"Put Command from Client<${src}>")
           storePart += (key -> value)
           trigger(
-            NetMessage(self, header.src, op.response(OpCode.Ok)) -> net
+            NetMessage(self, src, op.response(OpCode.Ok)) -> net
           )
         case Cas(key, referenceValue, newValue, _) =>
           val op = o.asInstanceOf[Cas]
-          log.info(s"Cas Command from Client<${header.src}>")
+          log.info(s"Cas Command from Client<${src}>")
           if (storePart.contains(key)) {
             val value = storePart(key)
             if (value == referenceValue) {
               storePart += (key -> newValue)
               trigger(
-                NetMessage(self, header.src, op.response(OpCode.Ok)) -> net
+                NetMessage(self, src, op.response(OpCode.Ok)) -> net
               )
             } else {
               trigger(
-                NetMessage(self, header.src, op.response(OpCode.NotSwap)) -> net
+                NetMessage(self, src, op.response(OpCode.NotSwap)) -> net
               )
             }
           } else {
             trigger(
-              NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net
+              NetMessage(self, src, op.response(OpCode.NotFound)) -> net
             )
           }
       }

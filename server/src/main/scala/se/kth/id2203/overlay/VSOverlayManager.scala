@@ -61,7 +61,7 @@ class VSOverlayManager extends ComponentDefinition {
       log.info("Generating LookupTable...")
 //      val lut = LookupTable.generate(nodes)
       val lut = LookupTable.generate(nodes, replicationDegree, maxKey);
-      logger.debug("Generated assignments:\n$lut")
+      logger.info("Generated assignments:\n$lut")
       trigger(new InitialAssignments(lut) -> boot)
     }
     case Booted(assignment: LookupTable) => {
